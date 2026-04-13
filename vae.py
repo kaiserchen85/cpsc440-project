@@ -2,140 +2,119 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
 class VAE(nn.Module):
     def __init__(
         self,
+        spec_shape=(1, 80, 128), # (Channels, Mel-bins, Time-frames)
         latent_dim=64,
         text_vocab_size=10000,
         text_embed_dim=128,
-        num_classes=2  # sarcastic / sincere
+        num_classes=2  # 0: sincere, 1: sarcastic
     ):
         super(VAE, self).__init__()
 
         self.latent_dim = latent_dim
         self.num_classes = num_classes
+        self.spec_shape = spec_shape
 
-        # CNN Encoder (audio only)
+        # 1. Text & Label Embeddings (Shared by Encoder and Decoder)
+        self.text_embedding = nn.Embedding(text_vocab_size, text_embed_dim)
+        self.text_fc = nn.Linear(text_embed_dim, 128)
+        self.label_fc = nn.Linear(num_classes, 32)
+
+        # 2. CNN Encoder (Extracts audio features)
         self.cnn_encoder = nn.Sequential(
-            nn.Conv2d(1, 32, 4, 2, 1),
+            nn.Conv2d(spec_shape[0], 32, 4, 2, 1),
             nn.ReLU(),
             nn.Conv2d(32, 64, 4, 2, 1),
             nn.ReLU(),
             nn.Conv2d(64, 128, 4, 2, 1),
             nn.ReLU(),
         )
-
         self.flatten = nn.Flatten()
 
-        self.fc_mu = None
-        self.fc_logvar = None
-
-        # Text embedding (decoder only)
-        self.text_embedding = nn.Embedding(text_vocab_size, text_embed_dim)
-        self.text_fc = nn.Linear(text_embed_dim, 128)
-
-        # Label embedding (decoder only)
-        self.label_fc = nn.Linear(num_classes, 32)
-
-        # Decoder (initialized later)
-        self.fc_decode = None
-        self.deconv = None
-
-    # Initialize encoder FC
-    def _init_encoder_fc(self, spec_shape):
+        # Calculate flattened CNN shape dynamically during init
         with torch.no_grad():
-            dummy = torch.zeros(spec_shape)
-            h = self.cnn_encoder(dummy)
-            h = self.flatten(h)
-            dim = h.shape[1]
+            dummy = torch.zeros(1, *spec_shape)
+            cnn_out = self.cnn_encoder(dummy)
+            self.enc_shape = cnn_out.shape[1:]  # Save (C, H, W) for decoder
+            cnn_flat_dim = cnn_out.numel() // cnn_out.shape[0]
 
-        self.fc_mu = nn.Linear(dim, self.latent_dim)
-        self.fc_logvar = nn.Linear(dim, self.latent_dim)
+        # 3. Latent Projections (Conditioned on Audio + Text + Tone)
+        # We add the text (128) and label (32) dimensions to the CNN output
+        total_enc_input = cnn_flat_dim + 128 + 32
+        self.fc_mu = nn.Linear(total_enc_input, latent_dim)
+        self.fc_logvar = nn.Linear(total_enc_input, latent_dim)
 
-        return dim
-
-    # Initialize decoder
-    def _init_decoder(self, spec_shape, encoder_dim):
-        # We reconstruct back to CNN feature map shape
-        with torch.no_grad():
-            dummy = torch.zeros(spec_shape)
-            h = self.cnn_encoder(dummy)
-            self.enc_shape = h.shape[1:]  # (C, H, W)
-            flat_dim = h.numel() // h.shape[0]
-
-        total_input = self.latent_dim + 128 + 32
-
-        self.fc_decode = nn.Linear(total_input, flat_dim)
+        # 4. Decoder Initialization
+        total_dec_input = latent_dim + 128 + 32
+        self.fc_decode = nn.Linear(total_dec_input, cnn_flat_dim)
 
         self.deconv = nn.Sequential(
             nn.ConvTranspose2d(128, 64, 4, 2, 1),
             nn.ReLU(),
             nn.ConvTranspose2d(64, 32, 4, 2, 1),
             nn.ReLU(),
-            nn.ConvTranspose2d(32, 1, 4, 2, 1),
+            nn.ConvTranspose2d(32, spec_shape[0], 4, 2, 1),
+            # Note: Depending on your mel-spec normalization, 
+            # you might need a Tanh or no activation here.
         )
 
-    # Encoder
-    def encode(self, spectrogram):
-        if self.fc_mu is None:
-            enc_dim = self._init_encoder_fc(spectrogram.shape)
-            self._init_decoder(spectrogram.shape, enc_dim)
+    def get_conditioning(self, text_tokens, labels):
+        """Helper to process text and labels into dense vectors."""
+        # Text: Pool over the sequence dimension (B, T) -> (B, 128)
+        text_emb = self.text_embedding(text_tokens).mean(dim=1) 
+        h_text = F.relu(self.text_fc(text_emb))                 
 
-        h = self.cnn_encoder(spectrogram)
-        h = self.flatten(h)
+        # Labels: One-hot encode then project (B) -> (B, 32)
+        labels_onehot = F.one_hot(labels, num_classes=self.num_classes).float()
+        h_label = F.relu(self.label_fc(labels_onehot))          
+        
+        return h_text, h_label
 
-        mu = self.fc_mu(h)
-        logvar = self.fc_logvar(h)
+    def encode(self, spectrogram, text_tokens, labels):
+        # Process audio
+        h_audio = self.cnn_encoder(spectrogram)
+        h_audio = self.flatten(h_audio)
 
+        # Process conditions
+        h_text, h_label = self.get_conditioning(text_tokens, labels)
+
+        # Concatenate audio features with text and label conditions
+        h_combined = torch.cat([h_audio, h_text, h_label], dim=1)
+
+        mu = self.fc_mu(h_combined)
+        logvar = self.fc_logvar(h_combined)
         return mu, logvar
 
-    # Reparameterization
     def reparameterize(self, mu, logvar):
         std = torch.exp(0.5 * logvar)
         eps = torch.randn_like(std)
         return mu + eps * std
 
-    # Decode
     def decode(self, z, text_tokens, labels):
-        # Text
-        text_emb = self.text_embedding(text_tokens)     # (B, T, D)
-        text_emb = text_emb.mean(dim=1)                 # simple pooling
-        h_text = F.relu(self.text_fc(text_emb))         # (B, 128)
+        # Process conditions (using the target labels during inference!)
+        h_text, h_label = self.get_conditioning(text_tokens, labels)
 
-        # Label
-        labels_onehot = F.one_hot(labels, num_classes=self.num_classes).float()
-        h_label = F.relu(self.label_fc(labels_onehot))  # (B, 32)
+        # Concatenate latent vector with conditions
+        h_combined = torch.cat([z, h_text, h_label], dim=1)
+        h_decoded = self.fc_decode(h_combined)
 
-        # Combine
-        h = torch.cat([z, h_text, h_label], dim=1)
-
-        h = self.fc_decode(h)
-
-        # reshape to CNN feature map
+        # Reshape to match the feature map expected by ConvTranspose2d
         B = z.shape[0]
-        C, H, W = self.enc_shape
-        h = h.view(B, C, H, W)
+        h_reshaped = h_decoded.view(B, *self.enc_shape)
 
-        x_hat = self.deconv(h)
-
+        x_hat = self.deconv(h_reshaped)
         return x_hat
 
-    # Forward
     def forward(self, spectrogram, text_tokens, labels):
-        mu, logvar = self.encode(spectrogram)
+        # 1. Encode with SOURCE labels
+        mu, logvar = self.encode(spectrogram, text_tokens, labels)
+        
+        # 2. Sample
         z = self.reparameterize(mu, logvar)
-
+        
+        # 3. Decode with SOURCE labels (during training to reconstruct)
         x_hat = self.decode(z, text_tokens, labels)
 
         return x_hat, mu, logvar
-    
-    
-    def vae_loss(x, x_hat, mu, logvar, beta=0.1):
-        recon_loss = F.mse_loss(x_hat, x)
-
-        kl_loss = -0.5 * torch.mean(
-            1 + logvar - mu.pow(2) - logvar.exp()
-        )
-
-        return recon_loss + beta * kl_loss
