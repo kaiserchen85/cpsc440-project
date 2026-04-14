@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 
 from vae import VAE
+from diffusion import Diffusion
 from utils import handle, main, run, load_dataset
 
 
@@ -73,6 +74,61 @@ def vae_test():
     plt.subplot(1, 2, 2)
     plt.imshow(x_hat[0, 0].detach().numpy(), aspect='auto', origin='lower')
     plt.title("Reconstruction")
+    plt.show()
+
+
+
+# TODO: Make the diffusion model even smaller so this can actually run? (I already reduced it a lot)
+# TODO: Add vocoding step using API (Use HiFi-GAN)
+# TODO: Make a function that can take in the actual dataset
+@handle("diffusion-test")
+def diffusion_test():
+    # 1. Setup Dummy Data
+    x = torch.zeros(1, 1, 80, 200)
+    for i in range(80):
+        for j in range(200):
+            if j % 20 == i % 20:
+                x[0, 0, i, j] = 1.0  # Diagonal lines
+                
+    text = torch.randint(0, 10000, (1, 10))
+    label = torch.tensor([1])  # Sarcastic
+
+    # 2. Initialize Model
+    model = Diffusion()
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+
+    # 3. Training Loop (Learning to denoise)
+    model.train()
+    print("Training...")
+    for step in range(300):
+        # The forward pass automatically handles adding noise and getting the target
+        noise_pred, actual_noise = model(x, text, label)
+        
+        # The loss is how badly it guessed the noise
+        loss = F.mse_loss(noise_pred, actual_noise)
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        if step % 50 == 0:
+            print(f"Step {step:3d} | Noise MSE Loss: {loss.item():.4f}")
+
+    # 4. Inference (Generating from pure noise)
+    model.eval()
+    print("\nGenerating sample...")
+    # Generate using the same text and label
+    x_generated = model.sample(text, label, num_inference_steps=50)
+
+    # 5. Visualize
+    plt.figure(figsize=(10, 4))
+    plt.subplot(1, 2, 1)
+    plt.imshow(x[0, 0].detach().numpy(), aspect='auto', origin='lower')
+    plt.title("Original Target")
+
+    plt.subplot(1, 2, 2)
+    plt.imshow(x_generated[0, 0].detach().numpy(), aspect='auto', origin='lower')
+    plt.title("Diffusion Generation")
     plt.show()
 
 
