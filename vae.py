@@ -6,9 +6,9 @@ class VAE(nn.Module):
     def __init__(
         self,
         spec_shape=(1, 80, 128), # (Channels, Mel-bins, Time-frames)
-        latent_dim=64,
-        text_vocab_size=10000,
-        text_embed_dim=128,
+        latent_dim=64, # number of latent variables to use
+        text_vocab_size=10000, # size of vocabulary, TODO: Discuss about keep or not
+        text_embed_dim=128, # mapping from vocab to integer, represents similarity
         num_classes=2  # 0: sincere, 1: sarcastic
     ):
         super(VAE, self).__init__()
@@ -18,11 +18,14 @@ class VAE(nn.Module):
         self.spec_shape = spec_shape
 
         # 1. Text & Label Embeddings (Shared by Encoder and Decoder)
+        # Translates words into mathematical values for matrix multiplication
+        # 128 and 32 are hyperparameters
         self.text_embedding = nn.Embedding(text_vocab_size, text_embed_dim)
         self.text_fc = nn.Linear(text_embed_dim, 128)
         self.label_fc = nn.Linear(num_classes, 32)
 
         # 2. CNN Encoder (Extracts audio features)
+        # 3 layers with ReLU
         self.cnn_encoder = nn.Sequential(
             nn.Conv2d(spec_shape[0], 32, 4, 2, 1),
             nn.ReLU(),
@@ -33,7 +36,7 @@ class VAE(nn.Module):
         )
         self.flatten = nn.Flatten()
 
-        # Calculate flattened CNN shape dynamically during init
+        # Calculate flattened CNN shape dynamically during init by passing dummy spectrogram in
         with torch.no_grad():
             dummy = torch.zeros(1, *spec_shape)
             cnn_out = self.cnn_encoder(dummy)
@@ -67,6 +70,7 @@ class VAE(nn.Module):
         h_text = F.relu(self.text_fc(text_emb))                 
 
         # Labels: One-hot encode then project (B) -> (B, 32)
+        # OHE used for ensuring network doesn't think sarcastic/sincere is ordinal in some way
         labels_onehot = F.one_hot(labels, num_classes=self.num_classes).float()
         h_label = F.relu(self.label_fc(labels_onehot))          
         
@@ -83,6 +87,7 @@ class VAE(nn.Module):
         # Concatenate audio features with text and label conditions
         h_combined = torch.cat([h_audio, h_text, h_label], dim=1)
 
+        # Compacts data
         mu = self.fc_mu(h_combined)
         logvar = self.fc_logvar(h_combined)
         return mu, logvar
@@ -96,7 +101,7 @@ class VAE(nn.Module):
         # Process conditions (using the target labels during inference!)
         h_text, h_label = self.get_conditioning(text_tokens, labels)
 
-        # Concatenate latent vector with conditions
+        # Concatenate latent vector with conditions and decompress
         h_combined = torch.cat([z, h_text, h_label], dim=1)
         h_decoded = self.fc_decode(h_combined)
 
@@ -104,6 +109,7 @@ class VAE(nn.Module):
         B = z.shape[0]
         h_reshaped = h_decoded.view(B, *self.enc_shape)
 
+        # Decoding the data
         x_hat = self.deconv(h_reshaped)
         return x_hat
 
