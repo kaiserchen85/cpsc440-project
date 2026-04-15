@@ -1,23 +1,67 @@
 ## Data (MUStARD audio)
 
-This file documents the **preprocessed MUStARD audio dataset** included with this repo, how it was produced, and how to use it.
+This file documents the **ready-to-use preprocessed MUStARD audio dataset** in this repo, how it was produced, and how to use it. The raw data is from [this repo](https://github.com/soujanyaporia/MUStARD?tab=readme-ov-file).
 
 ### Contents
 
-- **Quick facts** (where the data lives, what keys/shapes are)
-- **How to regenerate** (optional; most users won’t need this)
-- **Outputs** (files and array keys)
-- **Visualization** (plot labeled mel-spectrograms)
-- **What actually happens in preprocessing** (detailed, step-by-step)
-- **Using the preprocessed data** (recommended loading patterns)
+- [Preprocessed data summary (ready-to-use)](#preprocessed-data-summary-ready-to-use)
+  - [What’s inside (`mustard_logmel.npz`)](#whats-inside-mustard_logmelnpz)
+- [Using the preprocessed data](#using-the-preprocessed-data)
+  - [Loading the data](#loading-the-data)
+  - [What the tensors mean](#what-the-tensors-mean)
+  - [Common gotchas](#common-gotchas)
+- [MUStARD preprocessing](#mustard-preprocessing)
+  - [Inputs (raw MUStARD artifacts)](#inputs-raw-mustard-artifacts)
+  - [Run preprocessing (regenerate dataset)](#run-preprocessing-regenerate-dataset)
+  - [Outputs](#outputs)
+  - [Visualize a labeled mel-spectrogram](#visualize-a-labeled-mel-spectrogram)
+  - [What actually happens in preprocessing?](#what-actually-happens-in-preprocessing)
 
 ---
 
+## Preprocessed data summary (ready-to-use)
+
+The repo includes a ready-to-use preprocessed dataset at:
+
+- [`data/mustard_processed/mustard_logmel.npz`](../data/mustard_processed/mustard_logmel.npz)
+
+### What’s inside (`mustard_logmel.npz`)
+
+- **Splits / sample counts**:
+  - train: **552** samples
+  - val: **69** samples
+  - test: **69** samples
+- **Arrays / formats**:
+  - `specs_{split}`: `(N, 1, 80, 130)`, `float32` (normalized log-mel “images”)
+  - `labels_{split}`: `(N,)`, `int64` with `1 = sarcastic`, `0 = non-sarcastic`
+  - `ids_{split}`: `(N,)`, `object` (string MUStARD IDs like `1_60`)
+  - `meta`: JSON string (stored as a 1-element object array) with preprocessing parameters + relative paths
+
+## Using the preprocessed data
+
+### Loading the data
+
+```python
+import numpy as np
+
+d = np.load("data/mustard_processed/mustard_logmel.npz", allow_pickle=True)
+X_train = d["specs_train"]     # (N, 1, 80, 130), float32
+y_train = d["labels_train"]    # (N,), int64
+ids_train = d["ids_train"]     # (N,), object (strings)
+```
+
+### What the tensors mean
+
+- `specs_*` are **normalized log-mel spectrograms** (default range `[0,1]`).
+- Channel dimension is always `1`, so each item is an “image” of shape `(1, n_mels, n_frames)`.
+- Labels are binary: `1 = sarcastic`, `0 = non-sarcastic`.
+
+### Common gotchas
+
+- If you regenerate with different preprocessing flags (e.g. `--n-mels` or `--target-seconds`), the tensor shape will change; check `meta` inside the `.npz`.
+- `spectrogram.py --index` refers to the index **within the stored split arrays**, which follow the shuffled split order (seeded).
+
 ## MUStARD preprocessing
-
-Most users should not need to re-run preprocessing if the repo includes the precomputed dataset:
-
-- `data/mustard_processed/mustard_logmel.npz`
 
 ### Inputs (raw MUStARD artifacts)
 
@@ -67,6 +111,10 @@ python spectrogram.py --split train --index 0
 # or save to file:
 python spectrogram.py --split val --index 3 --save out/spec.png
 ```
+
+Example output (`--split train --index 0`):
+
+![Example labeled log-mel spectrogram](spec-example.png)
 
 ### What actually happens in preprocessing?
 
@@ -165,28 +213,3 @@ Also write:
 - `mustard_logmel.manifest.jsonl`: per-ID status for *training IDs* (ok/missing/exception) with relative paths
 
 ---
-
-## Using the preprocessed data
-
-### Loading
-
-```python
-import numpy as np
-
-d = np.load("data/mustard_processed/mustard_logmel.npz", allow_pickle=True)
-X_train = d["specs_train"]   # (N, 1, n_mels, n_frames), float32
-y_train = d["labels_train"]  # (N,), int64
-ids_train = d["ids_train"]   # (N,), object (strings)
-```
-
-### What the tensors mean
-
-- `specs_*` are **normalized log-mel spectrograms** (default range `[0,1]`).
-- Channel dimension is always `1`, so each item is an “image” of shape `(1, n_mels, n_frames)`.
-- Labels are binary: `1 = sarcastic`, `0 = non-sarcastic`.
-
-### Common gotchas
-
-- If you regenerate with different preprocessing flags (e.g. `--n-mels` or `--target-seconds`), the tensor shape will change; check `meta` inside the `.npz`.
-- `spectrogram.py --index` refers to the index **within the stored split arrays**, which follow the shuffled split order (seeded).
-
