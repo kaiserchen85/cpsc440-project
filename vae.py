@@ -5,7 +5,7 @@ import torch.nn.functional as F
 class VAE(nn.Module):
     def __init__(
         self,
-        spec_shape=(1, 80, 128), # (Channels, Mel-bins, Time-frames)
+        spec_shape=(2, 80, 128), # (Channels, Mel-bins, Time-frames), 2 channels: Mel-spectrogram + Fundamental Frequency
         latent_dim=64, # number of latent variables to use
         text_vocab_size=10000, # size of vocabulary, TODO: Discuss about keep or not
         text_embed_dim=128, # mapping from vocab to integer, represents similarity

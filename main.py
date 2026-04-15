@@ -30,19 +30,29 @@ def cvae_loss(x, x_hat, mu, logvar, beta=0.1, l1_weight=1.0, l2_weight=1.0):
 @handle("vae-test")
 def vae_test():
     # 1. Setup Dummy Data (B, C, H, W)
-    x = torch.zeros(1, 1, 80, 200)
+    mel_spectrogram = torch.zeros(1, 1, 80, 200)
 
     # add diagonal line pattern
     for i in range(80):
         for j in range(200):
             if j % 20 == i % 20:
-                x[0, 0, i, j] = 1.0
+                mel_spectrogram[0, 0, i, j] = 1.0
+
+    # Fundamental frequency f0 with dummy channel and height dimensions
+    f0_contour = torch.linspace(0.0, 1.0, 200).unsqueeze(0)
+    f0_reshaped = f0_contour.view(1, 1, 1, 200)
+
+    # "Stretch" the f0 to match the 80 mel-bins
+    f0_stretched = f0_reshaped.expand(-1, -1, 80, -1) 
+
+    # 4. Concat them together
+    x = torch.cat([mel_spectrogram, f0_stretched], dim=1) 
                 
     text = torch.randint(0, 10000, (1, 10))
     label = torch.tensor([1])
 
     # 2. Initialize Model with exact shape
-    model = VAE(spec_shape=(1, 80, 200))
+    model = VAE(spec_shape=(2, 80, 200))
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
     # 3. Training Loop with Beta Annealing
@@ -74,6 +84,16 @@ def vae_test():
     plt.subplot(1, 2, 2)
     plt.imshow(x_hat[0, 0].detach().numpy(), aspect='auto', origin='lower')
     plt.title("Reconstruction")
+    plt.show()
+
+    plt.figure(figsize=(10, 4))
+    plt.subplot(1, 2, 1)
+    plt.imshow(x[0, 1].detach().numpy(), aspect='auto', origin='lower')
+    plt.title("Original Pitch (f0)")
+
+    plt.subplot(1, 2, 2)
+    plt.imshow(x_hat[0, 1].detach().numpy(), aspect='auto', origin='lower')
+    plt.title("Reconstructed Pitch (f0)")
     plt.show()
 
 
