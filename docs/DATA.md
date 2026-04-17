@@ -2,6 +2,8 @@
 
 This file documents the **ready-to-use preprocessed MUStARD audio dataset** in this repo, how it was produced, and how to use it. The raw data is from [this repo](https://github.com/soujanyaporia/MUStARD?tab=readme-ov-file).
 
+For **model architecture, training, latent export, and generation** after these tensors exist, see [`MODEL.md`](MODEL.md).
+
 ### Contents
 
 - [Preprocessed data summary (ready-to-use)](#preprocessed-data-summary-ready-to-use)
@@ -35,7 +37,11 @@ The repo includes a ready-to-use preprocessed dataset at:
   - `specs_{split}`: `(N, 1, 80, 130)`, `float32` (normalized log-mel “images”)
   - `labels_{split}`: `(N,)`, `int64` with `1 = sarcastic`, `0 = non-sarcastic`
   - `ids_{split}`: `(N,)`, `object` (string MUStARD IDs like `1_60`)
+  - `tokens_{split}`: `(N, L)`, `int64` — BPE token IDs (fixed length `L`, padded; aligned row-for-row with `specs_*`)
   - `meta`: JSON string (stored as a 1-element object array) with preprocessing parameters + relative paths
+- **Sidecar text artifacts** (same directory as the `.npz`):
+  - `vocab.json`: token2id map + `meta` (`vocab_size`, `max_seq_len`, paths, etc.)
+  - `tokenizer.json`: Hugging Face `tokenizers` model (used to re-encode or inspect merges)
 
 ## Using the preprocessed data
 
@@ -47,6 +53,7 @@ import numpy as np
 d = np.load("data/mustard_processed/mustard_logmel.npz", allow_pickle=True)
 X_train = d["specs_train"]     # (N, 1, 80, 130), float32
 y_train = d["labels_train"]    # (N,), int64
+tok_train = d["tokens_train"]  # (N, L), int64
 ids_train = d["ids_train"]     # (N,), object (strings)
 ```
 
@@ -55,6 +62,19 @@ ids_train = d["ids_train"]     # (N,), object (strings)
 - `specs_*` are **normalized log-mel spectrograms** (default range `[0,1]`).
 - Channel dimension is always `1`, so each item is an “image” of shape `(1, n_mels, n_frames)`.
 - Labels are binary: `1 = sarcastic`, `0 = non-sarcastic`.
+- `tokens_*` rows match `specs_*` by index (same split, same shuffle). Build the BPE vocabulary with [`export_text_tokens.py`](../export_text_tokens.py) if you regenerate splits.
+
+### Vocoding (mel → waveform)
+
+Stored mels are **[0, 1]** after train-fitted min–max on dB. Constants live in `mustard_logmel.norm_stats.json` (`lo`, `hi`, `sr`, `n_fft`, `hop_length`, …).
+
+- **Griffin–Lim baseline** (no extra weights; good for sanity checks):
+
+```bash
+python vocode.py --split train --index 0 --out out.wav --backend griffin
+```
+
+- **HiFi-GAN (SpeechBrain, LJS checkpoint)** is optional (`--backend hifigan`). It expects a compatible mel distribution; upgrade `speechbrain` / `huggingface_hub` / `torchaudio` if Hugging Face download errors (see [`SETUP.md`](SETUP.md)).
 
 ### Common gotchas
 
@@ -203,9 +223,8 @@ For every split (train/val/test):
 
 Write `data/mustard_processed/mustard_logmel.npz` with:
 
-- `specs_train`, `labels_train`, `ids_train`
-- `specs_val`, `labels_val`, `ids_val`
-- `specs_test`, `labels_test`, `ids_test`
+- `specs_train`, `labels_train`, `ids_train` (and val/test)
+- After running token export: `tokens_train`, `tokens_val`, `tokens_test` (same row order as the corresponding `specs_*` / `labels_*` / `ids_*`)
 - `meta`: JSON string including preprocessing params and **relative paths**
 
 Also write:
