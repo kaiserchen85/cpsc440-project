@@ -1,11 +1,13 @@
+"""Convolutional conditional VAE on single-channel log-mel; see docs/MODEL.md."""
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 class VAE(nn.Module):
     def __init__(
         self,
-        spec_shape=(2, 80, 128), # (Channels, Mel-bins, Time-frames), 2 channels: Mel-spectrogram + Fundamental Frequency
+        spec_shape=(1, 80, 130),  # (C, mel_bins, time): single-channel log-mel from preprocess.py
         latent_dim=64, # number of latent variables to use
         text_vocab_size=10000, # size of vocabulary, TODO: Discuss about keep or not
         text_embed_dim=128, # mapping from vocab to integer, represents similarity
@@ -109,8 +111,12 @@ class VAE(nn.Module):
         B = z.shape[0]
         h_reshaped = h_decoded.view(B, *self.enc_shape)
 
-        # Decoding the data
+        # Decoding the data (ConvTranspose stack may be off by a few frames vs input width)
         x_hat = self.deconv(h_reshaped)
+        if x_hat.shape[-2:] != self.spec_shape[1:]:
+            x_hat = F.interpolate(
+                x_hat, size=self.spec_shape[1:], mode="bilinear", align_corners=False
+            )
         return x_hat
 
     def forward(self, spectrogram, text_tokens, labels):
