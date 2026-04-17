@@ -183,6 +183,13 @@ Interpretation:
 - `out/recon.wav` is vocoded from the model reconstruction `x̂`.
 - If `out/recon.wav` is much worse than `out/in.wav`, that’s a reconstruction problem (not just vocoder limits).
 
+What you should expect to hear:
+
+- Both files will sound like **low-quality, muffled speech** (Griffin–Lim artifacts are normal).
+- `out/in.wav` is the best-case reference under this vocoder (it comes from the dataset mel directly).
+- `out/recon.wav` should have **similar rhythm/energy patterns** as `out/in.wav` if reconstruction is good, but it may be blurrier or noisier.
+- If `out/recon.wav` turns into mostly noise or loses the speech-like cadence compared to `out/in.wav`, the model is not reconstructing well (often undertraining, overly strong KL pressure, or insufficient capacity).
+
 ### B) Generation sanity checks
 
 Pick a fixed prompt list and evaluate per run:
