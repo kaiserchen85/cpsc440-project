@@ -3,7 +3,6 @@ import json
 import math
 import os
 import pickle
-import random
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,6 +10,7 @@ from typing import Any, Dict, List, Sequence, Tuple
 
 import numpy as np
 
+from mustard_split import split_ids_random as _split_ids_random
 
 @dataclass(frozen=True)
 class PreprocessConfig:
@@ -146,29 +146,6 @@ def _load_mustard_json(json_path: Path) -> Dict[str, Any]:
     """Load MUStARD annotations (ID → dict with 'sarcasm' label, etc.)."""
     with json_path.open("r", encoding="utf-8") as f:
         return json.load(f)
-
-
-def _split_ids_random(
-    ids: Sequence[str],
-    seed: int,
-    train_frac: float,
-    val_frac: float,
-) -> Dict[str, List[str]]:
-    """Create a deterministic random train/val/test split over example IDs."""
-    if train_frac <= 0 or val_frac < 0 or train_frac + val_frac >= 1:
-        raise ValueError("invalid split fracs: require train>0, val>=0, train+val<1")
-    ids = list(ids)
-    rng = random.Random(seed)
-    rng.shuffle(ids)
-    n = len(ids)
-    n_train = int(round(n * train_frac))
-    n_val = int(round(n * val_frac))
-    n_train = min(max(n_train, 1), n)
-    n_val = min(max(n_val, 0), n - n_train)
-    train = ids[:n_train]
-    val = ids[n_train : n_train + n_val]
-    test = ids[n_train + n_val :]
-    return {"train": train, "val": val, "test": test}
 
 
 def _load_split_indices_pkl(pkl_path: Path) -> Any:
