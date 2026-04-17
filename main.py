@@ -35,7 +35,7 @@ def _project_root() -> Path:
 # Tunable training hyperparameters (see docs/MODEL.md for guidance)
 # ---------------------------------------------------------------------------
 VAE_BATCH_SIZE = 16
-VAE_EPOCHS = 5
+VAE_EPOCHS = 25
 VAE_LR = 1e-3
 VAE_TARGET_BETA = 0.1
 VAE_LATENT_DIM = 64
@@ -165,7 +165,7 @@ def vae_test():
 
 
 @handle("vae-train")
-def vae_train():
+def vae_train(args=None):
     """Train CVAE on real MUStARD mels + BPE tokens from data/mustard_processed/."""
     root = _project_root()
     npz_path = root / "data/mustard_processed/mustard_logmel.npz"
@@ -210,6 +210,12 @@ def vae_train():
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     global_step = 0
+    hist = {
+        "train_recon": [],
+        "train_kl": [],
+        "val_recon": [],
+        "val_kl": [],
+    }
     for epoch in range(epochs):
         model.train()
         train_recon = 0.0
@@ -256,6 +262,10 @@ def vae_train():
             f"epoch {epoch+1}: train recon {train_recon/n_tr:.4f} kl {train_kl/n_tr:.4f} | "
             f"val recon {val_recon/max(1,n_va):.4f} kl {val_kl/max(1,n_va):.4f}"
         )
+        hist["train_recon"].append(train_recon / n_tr)
+        hist["train_kl"].append(train_kl / n_tr)
+        hist["val_recon"].append(val_recon / max(1, n_va))
+        hist["val_kl"].append(val_kl / max(1, n_va))
 
     ckpt = root / "checkpoints" / "cvae_last.pt"
     ckpt.parent.mkdir(parents=True, exist_ok=True)
@@ -279,6 +289,36 @@ def vae_train():
         ckpt,
     )
     print(f"saved {ckpt}")
+
+    plot_path = None
+    if args is not None and getattr(args, "plot", None):
+        plot_path = Path(str(args.plot))
+    if plot_path is not None:
+        plot_path.parent.mkdir(parents=True, exist_ok=True)
+        import matplotlib.pyplot as plt
+
+        epochs_axis = list(range(1, epochs + 1))
+        fig = plt.figure(figsize=(10, 6))
+        ax1 = fig.add_subplot(2, 1, 1)
+        ax1.plot(epochs_axis, hist["train_recon"], label="train recon")
+        ax1.plot(epochs_axis, hist["val_recon"], label="val recon")
+        ax1.set_title("CVAE training curves")
+        ax1.set_ylabel("recon (L1 + MSE)")
+        ax1.grid(True, alpha=0.3)
+        ax1.legend()
+
+        ax2 = fig.add_subplot(2, 1, 2)
+        ax2.plot(epochs_axis, hist["train_kl"], label="train KL")
+        ax2.plot(epochs_axis, hist["val_kl"], label="val KL")
+        ax2.set_xlabel("epoch")
+        ax2.set_ylabel("KL")
+        ax2.grid(True, alpha=0.3)
+        ax2.legend()
+
+        fig.tight_layout()
+        fig.savefig(plot_path, dpi=160)
+        plt.close(fig)
+        print(f"saved training plot {plot_path}")
 
     if EXPORT_LATENTS_AFTER_TRAIN:
         lat_path = root / "checkpoints" / "cvae_latents.npz"

@@ -1,5 +1,6 @@
 import argparse
 from pathlib import Path
+import inspect
 
 import numpy as np
 
@@ -31,6 +32,16 @@ def run(question):
     return _funcs[question]()
 
 
+def run_with_args(question: str, args: argparse.Namespace):
+    if question not in _funcs:
+        raise ValueError(f"unknown question {question}")
+    fn = _funcs[question]
+    sig = inspect.signature(fn)
+    if len(sig.parameters) == 0:
+        return fn()
+    return fn(args)
+
+
 def main():
     parser = argparse.ArgumentParser()
     questions = sorted(_funcs.keys())
@@ -40,13 +51,19 @@ def main():
         nargs="+",
         help="A question ID to run, or 'all'.",
     )
+    parser.add_argument(
+        "--plot",
+        type=str,
+        default=None,
+        help="Optional output image path for commands that support it (e.g. vae-train).",
+    )
     args = parser.parse_args()
     for q in args.questions:
         if q == "all":
             for q in sorted(_funcs.keys()):
                 start = f"== {q} "
                 print("\n" + start + "=" * (80 - len(start)))
-                run(q)
+                run_with_args(q, args)
 
         else:
-            run(q)
+            run_with_args(q, args)

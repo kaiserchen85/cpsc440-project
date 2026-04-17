@@ -10,11 +10,14 @@
 | File | Role |
 |------|------|
 | [`docs/DATA.md`](docs/DATA.md) | Preprocessed tensors, regeneration, mel visualization |
-| [`docs/MODEL.md`](docs/MODEL.md) | CVAE architecture, training, latent export, generation |
+| [`docs/MODEL.md`](docs/MODEL.md) | CVAE architecture (model-only) |
 | [`docs/SETUP.md`](docs/SETUP.md) | Virtualenv and dependencies |
+| [`docs/TUNING.md`](docs/TUNING.md) | Baseline (25-epoch) training + how to evaluate/tune |
+| [`docs/USAGE.md`](docs/USAGE.md) | Post-training usage: generation, recon checks, latent exploration |
 | [`main.py`](main.py) | CLI: `vae-train`, `vae-export-latents`, `vae-test` |
 | [`vae.py`](vae.py) | `VAE` module |
 | [`dataset.py`](dataset.py) | `MustardMelDataset`; helpers for `spec_shape` / vocab size |
+| [`cvae_reconstruct.py`](cvae_reconstruct.py) | Dataset row → recon wavs (input vs encoder/decoder recon) |
 | [`cvae_generate.py`](cvae_generate.py) | Text + sarcasm label + sampled `z` → mel or `.wav` |
 | [`vocode.py`](vocode.py) | Mel → waveform (Griffin–Lim; optional HiFi-GAN) |
 | [`export_text_tokens.py`](export_text_tokens.py) | Train BPE, write `tokenizer.json` / `vocab.json`, merge `tokens_*` into `.npz` |
@@ -31,5 +34,6 @@ python main.py vae-test
 python main.py vae-train          # also writes checkpoints/cvae_latents.npz by default
 python main.py vae-export-latents # re-export latents from checkpoints/cvae_last.pt only
 python vocode.py --split train --index 0 --out /tmp/sample.wav --backend griffin
+python cvae_reconstruct.py --split train --index 0 --out-in-wav /tmp/in.wav --out-recon-wav /tmp/recon.wav
 python cvae_generate.py --text "Great, just great." --label 1 --out-wav /tmp/gen.wav
 ```
