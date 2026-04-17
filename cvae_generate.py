@@ -23,6 +23,24 @@ def _project_root() -> Path:
     return Path(__file__).resolve().parent
 
 
+def _write_wav_pcm16(path: Path, wav: np.ndarray, sr: int) -> None:
+    """
+    Fallback WAV writer that does not rely on libsndfile.
+    Writes mono 16-bit PCM using the Python stdlib `wave`.
+    """
+    import wave
+
+    x = np.asarray(wav, dtype=np.float32).reshape(-1)
+    x = np.clip(x, -1.0, 1.0)
+    pcm = (x * 32767.0).astype(np.int16)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with wave.open(str(path), "wb") as f:
+        f.setnchannels(1)
+        f.setsampwidth(2)  # int16
+        f.setframerate(int(sr))
+        f.writeframes(pcm.tobytes())
+
+
 def _encode_text(tokenizer_path: Path, text: str, max_len: int, pad_id: int) -> torch.Tensor:
     from tokenizers import Tokenizer
 
@@ -123,8 +141,15 @@ def main() -> None:
         stats = load_norm_stats(args.npz)
         mel_db = mel01_to_db(mel_np, stats)
         wav = vocode_griffin(mel_db, stats, n_iter=args.n_griffin)
+        if wav.size == 0:
+            raise SystemExit("vocoder produced empty waveform; cannot write .wav")
         args.out_wav.parent.mkdir(parents=True, exist_ok=True)
-        sf.write(str(args.out_wav), wav, int(stats["sr"]))
+        sr = int(stats["sr"])
+        # Prefer soundfile, but fall back if libsndfile can't write in this environment.
+        try:
+            sf.write(str(args.out_wav), wav, sr, format="WAV", subtype="PCM_16")
+        except Exception:
+            _write_wav_pcm16(args.out_wav, wav, sr)
         print(f"wrote wav sr={stats['sr']} -> {args.out_wav}")
 
     if not args.out_mel and not args.out_wav:

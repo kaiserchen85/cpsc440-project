@@ -112,6 +112,25 @@ Dry run (sanity check a small subset without writing outputs):
 python preprocess.py --dry-run --limit 20
 ```
 
+### Run transcript tokenization (required for training)
+
+The CVAE training code conditions on **text tokens** (`tokens_*` in the merged `.npz`). After you
+have `data/mustard_processed/mustard_logmel.npz`, run:
+
+```bash
+python export_text_tokens.py \
+  --json-path data/mustard_raw/sarcasm_data.json \
+  --npz-path data/mustard_processed/mustard_logmel.npz \
+  --vocab-out data/mustard_processed/vocab.json \
+  --tokenizer-out data/mustard_processed/tokenizer.json
+```
+
+This will:
+
+- Train a small BPE tokenizer **on train utterances only** (same deterministic split as preprocessing).
+- Write `vocab.json` (token ids + `meta`) and `tokenizer.json` (tokenizer model for inference).
+- Merge `tokens_{train,val,test}` into `mustard_logmel.npz`, aligned row-for-row with `ids_*`.
+
 ### Outputs
 
 Preprocessing writes:
@@ -120,9 +139,13 @@ Preprocessing writes:
   - `specs_train`, `labels_train`, `ids_train`
   - `specs_val`, `labels_val`, `ids_val`
   - `specs_test`, `labels_test`, `ids_test`
+  - After running `export_text_tokens.py`: `tokens_train`, `tokens_val`, `tokens_test`
   - `meta` (JSON string with preprocessing parameters + relative paths)
 - **`data/mustard_processed/mustard_logmel.manifest.jsonl`** (per-ID success/failure + paths)
 - **`data/mustard_processed/mustard_logmel.norm_stats.json`** (train-only normalization constants)
+- **After running** `export_text_tokens.py`:
+  - **`data/mustard_processed/vocab.json`** (BPE vocabulary + `meta` like `vocab_size`, `max_seq_len`, `pad_id`)
+  - **`data/mustard_processed/tokenizer.json`** (tokenizer model for encoding raw strings later)
 
 ### Visualize a labeled mel-spectrogram
 
@@ -134,7 +157,7 @@ python spectrogram.py --split val --index 3 --save out/spec.png
 
 Example output (`--split train --index 0`):
 
-![Example labeled log-mel spectrogram](spec-example.png)
+![Example labeled log-mel spectrogram](../img/spec-example.png)
 
 ### What actually happens in preprocessing?
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, Literal
@@ -14,6 +15,19 @@ Backend = Literal["griffin", "hifigan"]
 
 def _project_root() -> Path:
     return Path(__file__).resolve().parent
+
+
+def _configure_numba_cache() -> None:
+    """
+    Librosa pulls in numba; some environments error when numba tries to cache compiled
+    functions. Disable caching by default for robustness.
+    """
+    os.environ.setdefault("NUMBA_DISABLE_CACHING", "1")
+    os.environ.setdefault("NUMBA_CACHE_DIR", str(_project_root() / ".numba_cache"))
+    try:
+        Path(os.environ["NUMBA_CACHE_DIR"]).mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
 
 
 def load_norm_stats(npz_path: Path) -> Dict[str, Any]:
@@ -33,6 +47,7 @@ def mel01_to_db(mel: np.ndarray, stats: Dict[str, Any]) -> np.ndarray:
 
 
 def vocode_griffin(mel_db: np.ndarray, stats: Dict[str, Any], n_iter: int = 64) -> np.ndarray:
+    _configure_numba_cache()
     import librosa
 
     # Per preprocess: power mel -> power_to_db(..., ref=np.max). Inversion is approximate without per-frame ref.
@@ -53,6 +68,7 @@ def vocode_griffin(mel_db: np.ndarray, stats: Dict[str, Any], n_iter: int = 64) 
 
 def vocode_hifigan(mel_db: np.ndarray, stats: Dict[str, Any]) -> np.ndarray:
     """SpeechBrain pretrained HiFi-GAN (LJS). Mel domain may differ from MUStARD; listen before trusting."""
+    _configure_numba_cache()
     import librosa
     import torch
     import torchaudio

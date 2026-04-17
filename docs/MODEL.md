@@ -111,14 +111,37 @@ Requires `tokens_*` in the `.npz` and [`vocab.json`](../data/mustard_processed/v
 
 Each epoch prints train/val reconstruction and KL means. Checkpoints include `train_hparams` with the same values used for that run.
 
+### Example training output (how to read it)
+
+When you run `python main.py vae-train`, you’ll see one progress line per epoch (from `tqdm`) plus a short summary line with epoch averages:
+
+```text
+epoch 1/5 train: 100%|██████████████| 34/34 [00:03<00:00, 10.14it/s, beta=0.049, kl=0.1782, recon=0.1648]
+epoch 1: train recon 0.2336 kl 0.2843 | val recon 0.1548 kl 0.1509
+epoch 2/5 train: 100%|██████████████| 34/34 [00:03<00:00,  9.10it/s, beta=0.099, kl=0.1216, recon=0.1687]
+epoch 2: train recon 0.1563 kl 0.1123 | val recon 0.1567 kl 0.0924
+epoch 3/5 train: 100%|██████████████| 34/34 [00:03<00:00,  8.96it/s, beta=0.100, kl=0.0623, recon=0.1304]
+epoch 3: train recon 0.1495 kl 0.0952 | val recon 0.1427 kl 0.0930
+epoch 4/5 train: 100%|██████████████| 34/34 [00:03<00:00,  9.89it/s, beta=0.100, kl=0.1107, recon=0.1387]
+epoch 4: train recon 0.1460 kl 0.1080 | val recon 0.1472 kl 0.1224
+epoch 5/5 train: 100%|██████████████| 34/34 [00:03<00:00, 10.46it/s, beta=0.100, kl=0.0973, recon=0.1406]
+epoch 5: train recon 0.1437 kl 0.1106 | val recon 0.1326 kl 0.1316
+```
+
+- **`epoch k/K train: ... 34/34 ... it/s`**: training progress for that epoch (34 mini-batches here). The `beta`, `kl`, and `recon` shown on this line are the **most recent batch’s** values.
+- **`beta=...`**: the current KL weight used in `loss = recon + beta * kl`. It ramps up during warmup and then stays at `VAE_TARGET_BETA`.
+- **`recon=...`**: the current batch’s reconstruction loss (`L1 + MSE`) on normalized mels.
+- **`kl=...`**: the current batch’s KL term (how close the encoder posterior is to `Normal(0, I)`).
+- **`epoch k: train recon ... kl ... | val recon ... kl ...`**: **epoch averages** over the train and val splits. These are the numbers to track for learning progress (as opposed to the last-batch values in the progress bar).
+
 ### Outputs
 
 | Path | Contents |
 |------|----------|
-| `checkpoints/cvae_last.pt` | `model`, `spec_shape`, `text_vocab_size`, `latent_dim`, `train_hparams` |
-| `checkpoints/cvae_latents.npz` | Written when `EXPORT_LATENTS_AFTER_TRAIN` or when you run `vae-export-latents` |
+| `checkpoints/cvae_last.pt` | **Trained model checkpoint**: `model` (state_dict) + `spec_shape`, `text_vocab_size`, `latent_dim`, `train_hparams` |
+| `checkpoints/cvae_latents.npz` | **Latent export** (for t-SNE/UMAP): arrays `mu_*`, `z_*`, `ids_*`, `labels_*`, `meta_json` |
 
-`checkpoints/` is gitignored (see [`.gitignore`](../.gitignore)).
+By default, [`.gitignore`](../.gitignore) ignores most training artifacts but allows committing these two files so others can reuse the trained model and latents.
 
 ### Other `main.py` commands
 

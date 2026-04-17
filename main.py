@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import random
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -40,7 +42,23 @@ VAE_LATENT_DIM = 64
 # Linear KL warmup: beta ramps from 0 -> VAE_TARGET_BETA over this many optimizer steps
 VAE_KL_WARMUP_STEPS = None  # None = 2 * len(train_loader) per current epoch-1 length
 EXPORT_LATENTS_AFTER_TRAIN = True
+VAE_SEED = 440
 LATENT_EXPORT_SEED = 440
+
+
+def seed_everything(seed: int) -> None:
+    """Best-effort reproducibility for this project (CPU/GPU)."""
+    seed = int(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+    # Make CuDNN deterministic (may reduce performance).
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 
 def export_cvae_latents(
@@ -161,6 +179,7 @@ def vae_train():
     vocab_size = MustardMelDataset.text_vocab_size_from_json(vocab_path)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    seed_everything(VAE_SEED)
     batch_size = VAE_BATCH_SIZE
     epochs = VAE_EPOCHS
     lr = VAE_LR
@@ -170,8 +189,15 @@ def vae_train():
 
     train_ds = MustardMelDataset(npz_path, "train")
     val_ds = MustardMelDataset(npz_path, "val")
+    dl_gen = torch.Generator()
+    dl_gen.manual_seed(VAE_SEED)
     train_loader = DataLoader(
-        train_ds, batch_size=batch_size, shuffle=True, drop_last=True, num_workers=0
+        train_ds,
+        batch_size=batch_size,
+        shuffle=True,
+        drop_last=True,
+        num_workers=0,
+        generator=dl_gen,
     )
     val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=0)
 
@@ -234,6 +260,7 @@ def vae_train():
     ckpt = root / "checkpoints" / "cvae_last.pt"
     ckpt.parent.mkdir(parents=True, exist_ok=True)
     train_hparams = {
+        "seed": VAE_SEED,
         "batch_size": batch_size,
         "epochs": epochs,
         "lr": lr,
@@ -281,6 +308,7 @@ def vae_export_latents_cmd():
     latent_dim = int(ckpt.get("latent_dim", 64))
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    seed_everything(VAE_SEED)
     model = VAE(
         spec_shape=spec_shape, text_vocab_size=text_vocab_size, latent_dim=latent_dim
     ).to(device)
