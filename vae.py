@@ -7,7 +7,7 @@ import torch.nn.functional as F
 class VAE(nn.Module):
     def __init__(
         self,
-        spec_shape=(1, 80, 130),  # (C, mel_bins, time): single-channel log-mel from preprocess.py
+        spec_shape=(1, 80, 130),  # Fallback; callers should pass dataset-derived (C, mel_bins, time)
         latent_dim=64, # number of latent variables to use
         text_vocab_size=10000, # size of vocabulary, TODO: Discuss about keep or not
         text_embed_dim=128, # mapping from vocab to integer, represents similarity

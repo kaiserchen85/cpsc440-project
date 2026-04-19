@@ -21,7 +21,7 @@ For anything operational:
 
 | Artifact | Role |
 |----------|------|
-| [`data/mustard_processed/mustard_logmel.npz`](../data/mustard_processed/mustard_logmel.npz) | `specs_*` `(N,1,80,130)` float mel in `[0,1]`, `labels_*`, `ids_*`, `tokens_*` |
+| [`data/mustard_processed/mustard_logmel.npz`](../data/mustard_processed/mustard_logmel.npz) | `specs_*` `(N,1,80,T)` float mel in `[0,1]`, `labels_*`, `ids_*`, `tokens_*` |
 | [`data/mustard_processed/vocab.json`](../data/mustard_processed/vocab.json) | BPE `meta`: `vocab_size`, `max_seq_len`, pad/unk ids |
 | [`data/mustard_processed/tokenizer.json`](../data/mustard_processed/tokenizer.json) | Same BPE as training (used by usage scripts for encoding raw strings) |
 | [`data/mustard_processed/mustard_logmel.norm_stats.json`](../data/mustard_processed/mustard_logmel.norm_stats.json) | Denorm / vocoding constants (used by usage scripts) |
@@ -34,7 +34,7 @@ For anything operational:
 
 The network maps:
 
-- **Mel** `x`: `(batch, 1, 80, 130)` — same layout as `specs_*`.
+- **Mel** `x`: `(batch, 1, 80, T)` — same layout as `specs_*` (`T` comes from preprocessing config).
 - **Tokens** `(batch, T)` — BPE ids, padded length `T` = `max_seq_len` from `vocab.json` (typically 64).
 - **Label** `y`: `(batch,)` int64, values `0` or `1` (same encoding as `labels_*`).
 
@@ -50,7 +50,7 @@ to a reconstruction `x̂` with the same shape as `x`, and (during training) a KL
 ### Latent and decoder
 
 - **Reparameterization:** `z = mu + exp(0.5 * logvar) * epsilon`, `epsilon ~ Normal(0, I)` (see `reparameterize` in [`vae.py`](../vae.py)).
-- **Decoder:** concat `[z, h_text, h_label]` → linear to vector of length `flattened CNN dim` → reshape to `enc_shape` → three `ConvTranspose2d` blocks mirroring the encoder. If output spatial size ≠ `(80, 130)`, **`F.interpolate`** bilinearly to `spec_shape[1:]`.
+- **Decoder:** concat `[z, h_text, h_label]` → linear to vector of length `flattened CNN dim` → reshape to `enc_shape` → three `ConvTranspose2d` blocks mirroring the encoder. If output spatial size differs, **`F.interpolate`** bilinearly to `spec_shape[1:]`.
 
 ### Loss (`cvae_loss` in `main.py`)
 
@@ -61,7 +61,7 @@ to a reconstruction `x̂` with the same shape as `x`, and (during training) a KL
 ```mermaid
 flowchart TB
   subgraph in[Inputs]
-    M["x (B,1,80,130)"]
+    M["x (B,1,80,T)"]
     TOK["tokens (B,T)"]
     LAB["y (B,)"]
   end

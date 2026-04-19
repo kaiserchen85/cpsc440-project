@@ -84,7 +84,7 @@ def main() -> None:
         default=root / "data/mustard_processed/mustard_logmel.npz",
         help="Used for norm_stats sibling path",
     )
-    p.add_argument("--out-mel", type=Path, help="Write float32 mel (1,80,130) .npy")
+    p.add_argument("--out-mel", type=Path, help="Write float32 mel (1,80,T) .npy (T from checkpoint spec_shape)")
     p.add_argument("--out-wav", type=Path, help="Write waveform via Griffin–Lim")
     p.add_argument("--seed", type=int, default=440)
     p.add_argument(

@@ -31,6 +31,8 @@
 ```bash
 cd cpsc440-project
 python main.py vae-test
+python preprocess.py
+python export_text_tokens.py
 python main.py vae-train --plot img/train_summary_epoch25.png
 python main.py vae-export-latents # re-export latents from checkpoints/cvae_last.pt only
 python vocode.py --split train --index 0 --out /tmp/sample.wav --backend griffin
@@ -40,5 +42,6 @@ python cvae_generate.py --text "Great, just great." --label 1 --out-wav /tmp/gen
 
 Notes:
 
+- Preprocessing now defaults to `--target-seconds 5.0` (see [`docs/DATA.md`](docs/DATA.md) for rationale and shape details).
 - For the baseline training run and how to interpret the plot/logs, start with [`docs/TUNING.md`](docs/TUNING.md).
 - For model architecture only, see [`docs/MODEL.md`](docs/MODEL.md). For post-training workflows, see [`docs/USAGE.md`](docs/USAGE.md).

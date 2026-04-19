@@ -7,7 +7,7 @@
   "n_fft": 2048,
   "hop_length": 512,
   "n_mels": 80,
-  "target_seconds": 3.0,
+  "target_seconds": 5.0,
   "trim_top_db": 30.0,
   "seed": 440,
   "train_ids_used_for_stats": [

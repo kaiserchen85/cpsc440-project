@@ -118,17 +118,27 @@ def export_cvae_latents(
 
 @handle("vae-test")
 def vae_test():
-    """Short sanity run on synthetic (1, 80, 130) mel — matches merged .npz channel layout."""
-    mel = torch.zeros(1, 1, 80, 130)
-    for i in range(80):
-        for j in range(130):
-            if j % 20 == i % 20:
+    """Short sanity run on synthetic mel matching dataset spec_shape when available."""
+    root = _project_root()
+    npz_path = root / "data/mustard_processed/mustard_logmel.npz"
+    if npz_path.is_file():
+        spec_shape = MustardMelDataset.spec_shape_from_npz(npz_path, "train")
+    else:
+        # Fallback shape for quick checks before preprocessing exists.
+        spec_shape = (1, 80, 130)
+
+    _, mel_bins, frames = spec_shape
+    mel = torch.zeros(1, *spec_shape)
+    stripe_mod = max(1, frames // 8)
+    for i in range(mel_bins):
+        for j in range(frames):
+            if j % stripe_mod == i % stripe_mod:
                 mel[0, 0, i, j] = 1.0
 
     text = torch.randint(0, 10000, (1, 64))
     label = torch.tensor([1])
 
-    model = VAE(spec_shape=(1, 80, 130), latent_dim=VAE_LATENT_DIM)
+    model = VAE(spec_shape=spec_shape, latent_dim=VAE_LATENT_DIM)
     optimizer = torch.optim.Adam(model.parameters(), lr=VAE_LR)
 
     total_steps = 200

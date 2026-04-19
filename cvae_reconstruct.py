@@ -109,7 +109,7 @@ def main() -> None:
     model.load_state_dict(ckpt["model"])
     model.eval()
 
-    xb = x.unsqueeze(0).to(device)  # (1,1,80,130)
+    xb = x.unsqueeze(0).to(device)  # (1,1,80,T)
     tb = tokens.unsqueeze(0).to(device)  # (1,T)
     yb = y.unsqueeze(0).to(device)  # (1,)
     with torch.no_grad():

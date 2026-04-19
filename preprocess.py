@@ -190,7 +190,7 @@ def main() -> None:
     p.add_argument("--n-fft", type=int, default=2048)
     p.add_argument("--hop-length", type=int, default=512)
     p.add_argument("--n-mels", type=int, default=80)
-    p.add_argument("--target-seconds", type=float, default=3.0)
+    p.add_argument("--target-seconds", type=float, default=5.0)
     p.add_argument("--trim-top-db", type=float, default=30.0)
     p.add_argument("--seed", type=int, default=440)
     p.add_argument("--train-frac", type=float, default=0.8)

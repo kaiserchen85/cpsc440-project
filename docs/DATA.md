@@ -34,7 +34,7 @@ The repo includes a ready-to-use preprocessed dataset at:
   - val: **69** samples
   - test: **69** samples
 - **Arrays / formats**:
-  - `specs_{split}`: `(N, 1, 80, 130)`, `float32` (normalized log-mel “images”)
+  - `specs_{split}`: `(N, 1, 80, T)`, `float32` (normalized log-mel “images”; for default 5s config, `T` is typically `216`)
   - `labels_{split}`: `(N,)`, `int64` with `1 = sarcastic`, `0 = non-sarcastic`
   - `ids_{split}`: `(N,)`, `object` (string MUStARD IDs like `1_60`)
   - `tokens_{split}`: `(N, L)`, `int64` — BPE token IDs (fixed length `L`, padded; aligned row-for-row with `specs_*`)
@@ -51,7 +51,7 @@ The repo includes a ready-to-use preprocessed dataset at:
 import numpy as np
 
 d = np.load("data/mustard_processed/mustard_logmel.npz", allow_pickle=True)
-X_train = d["specs_train"]     # (N, 1, 80, 130), float32
+X_train = d["specs_train"]     # (N, 1, 80, T), float32
 y_train = d["labels_train"]    # (N,), int64
 tok_train = d["tokens_train"]  # (N, L), int64
 ids_train = d["ids_train"]     # (N,), object (strings)
@@ -80,6 +80,12 @@ python vocode.py --split train --index 0 --out out.wav --backend griffin
 
 - If you regenerate with different preprocessing flags (e.g. `--n-mels` or `--target-seconds`), the tensor shape will change; check `meta` inside the `.npz`.
 - `spectrogram.py --index` refers to the index **within the stored split arrays**, which follow the shuffled split order (seeded).
+
+### Why 5-second default windows?
+
+- Raw MUStARD utterance durations are right-skewed with median around `4.76s` and mean around `5.22s`.
+- Using `5.0s` as the default fixed window better matches that distribution than `3.0s`, which reduces aggressive truncation for many clips.
+- We keep all examples (no outlier deletion) and still enforce fixed length for stable model input shapes.
 
 ## MUStARD preprocessing
 
@@ -207,7 +213,7 @@ Given the wav waveform `y`:
 
 - Trim leading/trailing silence via `librosa.effects.trim(y, top_db=trim_top_db)` (default `30 dB`).
 - Enforce one fixed-duration example per utterance:
-  - target length in samples = `target_seconds * sr` (default `3.0 * 22050`)
+  - target length in samples = `target_seconds * sr` (default `5.0 * 22050`)
   - if longer: **center crop**
   - if shorter: **zero pad** equally left/right (center pad)
 
@@ -221,7 +227,7 @@ Compute mel power then convert to dB:
 - mel bins: `n_mels` (default `80`)
 - Convert to dB with `librosa.power_to_db(..., ref=np.max)`
 
-Result: `spec_db` shaped `(n_mels, n_frames)` (for defaults, `n_frames` is typically `130`).
+Result: `spec_db` shaped `(n_mels, n_frames)` (for defaults, `n_frames` is typically `216`).
 
 #### 7) Train-only normalization stats
 

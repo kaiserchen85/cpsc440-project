@@ -40,22 +40,23 @@ The current training loop is `python main.py vae-train` (see [`main.py`](../main
 - **`VAE_BATCH_SIZE = 16`**
 - **`VAE_SEED = 440`** (best-effort reproducibility)
 - KL warmup: `VAE_KL_WARMUP_STEPS = None` → computed as `2 * len(train_loader)`
+- Data preprocessing default: `preprocess.py --target-seconds 5.0` (so mel width is no longer the old 3s width)
 
-An example 25-epoch run summary looked like:
+An example run summary on the 5s-preprocessed data looked like:
 
 ```text
-epoch 1: train recon 0.2336 kl 0.2843 | val recon 0.1548 kl 0.1509
-epoch 2: train recon 0.1563 kl 0.1123 | val recon 0.1567 kl 0.0924
-epoch 3: train recon 0.1495 kl 0.0952 | val recon 0.1427 kl 0.0930
-epoch 4: train recon 0.1460 kl 0.1080 | val recon 0.1472 kl 0.1224
-epoch 5: train recon 0.1437 kl 0.1106 | val recon 0.1326 kl 0.1316
+epoch 1: train recon 0.3365 kl 1.3271 | val recon 0.1886 kl 0.2534
+epoch 2: train recon 0.1640 kl 0.1800 | val recon 0.1569 kl 0.1280
+epoch 3: train recon 0.1482 kl 0.1537 | val recon 0.1468 kl 0.1400
+epoch 4: train recon 0.1403 kl 0.1616 | val recon 0.1429 kl 0.1498
+epoch 5: train recon 0.1426 kl 0.1630 | val recon 0.1350 kl 0.1519
 ...
-epoch 25: train recon 0.1047 kl 0.1143 | val recon 0.1041 kl 0.1270
+epoch 25: train recon 0.0987 kl 0.1518 | val recon 0.1002 kl 0.1550
 ```
 
 Interpretation:
 
-- **Recon decreases substantially** (e.g. `val recon` from ~0.15 → ~0.10 by epoch 25) → training is healthy.
+- **Recon decreases substantially** (e.g. `val recon` from ~0.19 → ~0.10) → training is healthy.
 - **KL stays nonzero** → the latent is being used (not obviously collapsed).
 - **Val recon ~ train recon** throughout → no obvious overfitting in 25 epochs.
 
@@ -80,11 +81,17 @@ How to read it:
 From `cpsc440-project/`:
 
 ```bash
+# Regenerate fixed-length mels (default target_seconds is now 5.0)
+python preprocess.py
+
 # Ensure tokens exist (required for training)
 python export_text_tokens.py
 
 # Train (overwrites checkpoints/cvae_last.pt and usually checkpoints/cvae_latents.npz)
 python main.py vae-train --plot img/train_summary_epoch25.png
+
+# Optional: refresh exported latents from the latest checkpoint
+python main.py vae-export-latents
 ```
 
 ### What “good” looks like in logs
