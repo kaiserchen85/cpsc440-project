@@ -36,7 +36,7 @@ python export_text_tokens.py
 python main.py vae-train --plot img/train_summary_epoch25.png
 python main.py vae-export-latents # re-export latents from checkpoints/cvae_last.pt only
 python vocode.py --split train --index 0 --out /tmp/sample.wav --backend griffin
-python cvae_reconstruct.py --split train --index 0 --out-in-wav /tmp/in.wav --out-recon-wav /tmp/recon.wav
+python cvae_reconstruct.py --split train --index 0 --out-in-wav /tmp/in.wav --out-recon-wav /tmp/recon.wav --out-plot out/recon_plot.png
 python cvae_generate.py --text "Great, just great." --label 1 --out-wav /tmp/gen.wav
 ```
 

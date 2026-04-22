@@ -181,6 +181,7 @@ python cvae_reconstruct.py \
   --split train --index 0 \
   --out-in-wav out/in.wav \
   --out-recon-wav out/recon.wav \
+  --out-plot out/recon_plot.png \
   --n-griffin 64
 ```
 

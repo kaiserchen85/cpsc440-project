@@ -34,13 +34,13 @@ def _project_root() -> Path:
 # ---------------------------------------------------------------------------
 # Tunable training hyperparameters (see docs/MODEL.md for guidance)
 # ---------------------------------------------------------------------------
-VAE_BATCH_SIZE = 16
-VAE_EPOCHS = 25
+VAE_BATCH_SIZE = 32
+VAE_EPOCHS = 50
 VAE_LR = 1e-3
 VAE_TARGET_BETA = 0.1
-VAE_LATENT_DIM = 64
+VAE_LATENT_DIM = 256
 # Linear KL warmup: beta ramps from 0 -> VAE_TARGET_BETA over this many optimizer steps
-VAE_KL_WARMUP_STEPS = None  # None = 2 * len(train_loader) per current epoch-1 length
+VAE_KL_WARMUP_STEPS = 100  # None = 2 * len(train_loader) per current epoch-1 length
 EXPORT_LATENTS_AFTER_TRAIN = True
 VAE_SEED = 440
 LATENT_EXPORT_SEED = 440
