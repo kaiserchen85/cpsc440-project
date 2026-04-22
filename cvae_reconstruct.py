@@ -11,6 +11,7 @@ import argparse
 import json
 import shutil
 from pathlib import Path
+import matplotlib.pyplot as plt
 
 import numpy as np
 import torch
@@ -73,6 +74,12 @@ def main() -> None:
         default=None,
         help="Optional: if data/mustard_raw/audio/{id}.wav exists, copy it here for comparison",
     )
+    p.add_argument(
+        "--out-plot",
+        type=Path,
+        default=None,
+        help="Output path for the Mel-Spectrogram comparison plot (PNG)",
+    )
     p.add_argument("--n-griffin", type=int, default=64)
     args = p.parse_args()
 
@@ -117,6 +124,27 @@ def main() -> None:
 
     x_np = x.cpu().numpy().astype(np.float32)
     xh_np = x_hat[0].cpu().numpy().astype(np.float32)
+
+    plt.figure(figsize=(10, 4))
+    plt.subplot(1, 2, 1)
+    plt.imshow(x_np[0], aspect="auto", origin="lower")
+    plt.title("Original Mel")
+
+    plt.subplot(1, 2, 2)
+    plt.imshow(xh_np[0], aspect="auto", origin="lower")
+    plt.title("Reconstructed Mel")
+
+    if args.out_plot is not None:
+        save_path = args.out_plot
+    else:
+        # Fallback to the original logic if no path is provided
+        save_path = root / "out" / f"recon_check_{clip_id}.png"
+
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(save_path, dpi=160, bbox_inches="tight")
+    plt.close()
+    
+    print(f"wrote plot      -> {save_path}")
 
     stats = load_norm_stats(args.npz)
     sr = int(stats["sr"])
