@@ -8,6 +8,25 @@ This document assumes you already have:
 
 If you still need to train or tune, go to [`TUNING.md`](TUNING.md). For model architecture only, see [`MODEL.md`](MODEL.md).
 
+### Best model (current)
+
+The repo is currently set up to use the **best CVAE hyperparameters we found** (saved as constants at the top of [`main.py`](../main.py)). Training with `python main.py vae-train` will write `checkpoints/cvae_last.pt`, and the checkpoint also stores these values under `train_hparams` for reproducibility.
+
+- **Training command**: `python main.py vae-train`
+- **Checkpoint path**: `checkpoints/cvae_last.pt`
+- **Processed dataset path**: `data/mustard_processed/mustard_logmel.npz` (shape is inferred at runtime via `spec_shape_from_npz`, so it’s OK if preprocessing produced a larger `.npz`)
+
+Hyperparameters:
+
+- **batch size**: 32
+- **epochs**: 50
+- **optimizer**: Adam
+- **learning rate**: 1e-3
+- **latent dim**: 256
+- **KL target beta**: 0.1
+- **KL warmup**: linear ramp over 100 optimizer steps
+- **seed**: 440 (training) / 440 (latent export)
+
 ### Contents
 
 - [What artifacts matter](#what-artifacts-matter)
