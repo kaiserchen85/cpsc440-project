@@ -73,6 +73,13 @@ def export_cvae_latents(
     Save encoder means `mu` and one stochastic `z` per row (reparameterization with
     fixed RNG) for train/val/test, aligned with `id_*` / `label_*` row order in the
     merged dataset (same order as `MustardMelDataset` sequential access).
+
+    Note: this model's encoder is conditional on the label `y`. To support *meaningful*
+    downstream analysis (UMAP/probes) without trivial label leakage, we also export
+    "label-fixed" embeddings where every sample is encoded with a constant label:
+
+    - `mu_y0_*`: encode(x, text, y=0) for all rows
+    - `mu_y1_*`: encode(x, text, y=1) for all rows
     """
     model.eval()
     gen = torch.Generator(device=device)
@@ -91,21 +98,33 @@ def export_cvae_latents(
         ds = MustardMelDataset(npz_path, split)  # type: ignore[arg-type]
         loader = DataLoader(ds, batch_size=64, shuffle=False, num_workers=0)
         mus, zs, labs, ids_list = [], [], [], []
+        mus_y0, mus_y1 = [], []
         with torch.no_grad():
             for x, text, y, clip_ids in loader:
                 x = x.to(device)
                 text = text.to(device)
                 y = y.to(device)
                 mu, logvar = model.encode(x, text, y)
+
+                # Label-fixed embeddings for analysis without trivial label leakage.
+                y0 = torch.zeros_like(y)
+                y1 = torch.ones_like(y)
+                mu_y0, _ = model.encode(x, text, y0)
+                mu_y1, _ = model.encode(x, text, y1)
+
                 std = torch.exp(0.5 * logvar)
                 eps = torch.randn(std.shape, device=device, dtype=std.dtype, generator=gen)
                 z = mu + std * eps
                 mus.append(mu.cpu().numpy().astype(np.float32, copy=False))
+                mus_y0.append(mu_y0.cpu().numpy().astype(np.float32, copy=False))
+                mus_y1.append(mu_y1.cpu().numpy().astype(np.float32, copy=False))
                 zs.append(z.cpu().numpy().astype(np.float32, copy=False))
                 labs.append(y.cpu().numpy().astype(np.int64, copy=False))
                 ids_list.extend(str(i) for i in clip_ids)
 
         bundle[f"mu_{split}"] = np.concatenate(mus, axis=0)
+        bundle[f"mu_y0_{split}"] = np.concatenate(mus_y0, axis=0)
+        bundle[f"mu_y1_{split}"] = np.concatenate(mus_y1, axis=0)
         bundle[f"z_{split}"] = np.concatenate(zs, axis=0)
         bundle[f"labels_{split}"] = np.concatenate(labs, axis=0)
         bundle[f"ids_{split}"] = np.asarray(ids_list, dtype=object)
@@ -305,8 +324,6 @@ def vae_train(args=None):
         plot_path = Path(str(args.plot))
     if plot_path is not None:
         plot_path.parent.mkdir(parents=True, exist_ok=True)
-        import matplotlib.pyplot as plt
-
         epochs_axis = list(range(1, epochs + 1))
         fig = plt.figure(figsize=(10, 6))
         ax1 = fig.add_subplot(2, 1, 1)

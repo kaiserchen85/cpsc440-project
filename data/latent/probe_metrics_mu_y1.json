@@ -1,0 +1,31 @@
+{
+  "label_counts": {
+    "test": {
+      "0": 42,
+      "1": 27
+    },
+    "train": {
+      "0": 269,
+      "1": 283
+    },
+    "val": {
+      "0": 34,
+      "1": 35
+    }
+  },
+  "n_test": 69,
+  "n_train": 552,
+  "n_val": 69,
+  "settings": {
+    "embedding": "mu_y1",
+    "latents": "checkpoints/cvae_latents.npz",
+    "out_metrics": "data/latent/probe_metrics_mu_y1.json",
+    "out_plot": "img/umap_mu_y1.png",
+    "pca_dim": 50,
+    "seed": 440,
+    "umap_min_dist": 0.1,
+    "umap_neighbors": 15
+  },
+  "shuffle_test_auc": 0.501763668430335,
+  "test_auc": 0.7142857142857143
+}

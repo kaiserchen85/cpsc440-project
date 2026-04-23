@@ -14,6 +14,7 @@
 | [`docs/SETUP.md`](docs/SETUP.md) | Virtualenv and dependencies |
 | [`docs/TUNING.md`](docs/TUNING.md) | Baseline (25-epoch) training + how to evaluate/tune |
 | [`docs/USAGE.md`](docs/USAGE.md) | Post-training usage: generation, recon checks, latent exploration |
+| [`docs/LATENT.md`](docs/LATENT.md) | Latent-space exploration (UMAP + probe, with label-fixed embeddings) |
 | [`main.py`](main.py) | CLI: `vae-train`, `vae-export-latents`, `vae-test` |
 | [`vae.py`](vae.py) | `VAE` module |
 | [`dataset.py`](dataset.py) | `MustardMelDataset`; helpers for `spec_shape` / vocab size |
@@ -35,6 +36,7 @@ python preprocess.py
 python export_text_tokens.py
 python main.py vae-train --plot img/train_summary_epoch25.png
 python main.py vae-export-latents # re-export latents from checkpoints/cvae_last.pt only
+python explore_latents.py --embedding mu_y0 # UMAP + probe on label-fixed latents
 python vocode.py --split train --index 0 --out /tmp/sample.wav --backend griffin
 python cvae_reconstruct.py --split train --index 0 --out-in-wav /tmp/in.wav --out-recon-wav /tmp/recon.wav --out-plot out/recon_plot.png
 python cvae_generate.py --text "Great, just great." --label 1 --out-wav /tmp/gen.wav
