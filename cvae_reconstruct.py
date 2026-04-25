@@ -128,11 +128,15 @@ def main() -> None:
     plt.figure(figsize=(10, 4))
     plt.subplot(1, 2, 1)
     plt.imshow(x_np[0], aspect="auto", origin="lower")
-    plt.title("Original Mel")
+    plt.title("Original Mel (Sincere)")
+    plt.xlabel("Time Frames")
+    plt.ylabel("Mel Bins")
 
     plt.subplot(1, 2, 2)
     plt.imshow(xh_np[0], aspect="auto", origin="lower")
-    plt.title("Reconstructed Mel")
+    plt.title("Reconstructed Mel (Sincere)")
+    plt.xlabel("Time Frames")
+    plt.ylabel("Mel Bins")
 
     if args.out_plot is not None:
         save_path = args.out_plot
