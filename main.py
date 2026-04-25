@@ -357,6 +357,75 @@ def vae_train(args=None):
             seed=LATENT_EXPORT_SEED,
         )
 
+@handle("vae-evaluate")
+def vae_evaluate(args=None):
+    """Evaluate the trained CVAE on the test split (structured like vae-train)."""
+    root = _project_root()
+    npz_path = root / "data/mustard_processed/mustard_logmel.npz"
+    vocab_path = root / "data/mustard_processed/vocab.json"
+    ckpt_path = root / "checkpoints" / "cvae_last.pt"
+
+    if not ckpt_path.is_file():
+        raise FileNotFoundError(f"missing {ckpt_path} — run `python main.py vae-train` first")
+    if not npz_path.is_file():
+        raise FileNotFoundError(f"missing {npz_path}")
+    if not vocab_path.is_file():
+        raise FileNotFoundError(f"missing {vocab_path} (run export_text_tokens.py)")
+
+    # 1. Setup (Mirroring vae_train checkpoint loading)
+    ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+    spec_shape = tuple(ckpt["spec_shape"])
+    vocab_size = int(ckpt["text_vocab_size"])
+    latent_dim = int(ckpt.get("latent_dim", VAE_LATENT_DIM))
+    
+    # Use the beta from training, default to the global constant if missing
+    target_beta = ckpt.get("train_hparams", {}).get("target_beta", VAE_TARGET_BETA)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    seed_everything(VAE_SEED)
+    batch_size = VAE_BATCH_SIZE
+
+    # 2. Data Loader (Mirroring the val_loader setup in vae_train)
+    test_ds = MustardMelDataset(npz_path, "test")
+    test_loader = DataLoader(test_ds, batch_size=batch_size, shuffle=False, num_workers=0)
+
+    # 3. Model Initialization (Mirroring vae_train)
+    model = VAE(
+        spec_shape=spec_shape, text_vocab_size=vocab_size, latent_dim=latent_dim
+    ).to(device)
+    model.load_state_dict(ckpt["model"])
+    
+    # 4. Evaluation Loop (Mirroring the validation loop in vae_train)
+    model.eval()
+    test_recon = 0.0
+    test_kl = 0.0
+    n_test = 0
+    
+    # Adding the tqdm progress bar exactly like your train loop
+    from tqdm import tqdm
+    pbar = tqdm(test_loader, desc="test evaluation")
+    
+    with torch.no_grad():
+        for x, text, y, _ in pbar:
+            x = x.to(device)
+            text = text.to(device)
+            y = y.to(device)
+            
+            x_hat, mu, logvar = model(x, text, y)
+            recon, kl, _ = cvae_loss(x, x_hat, mu, logvar, beta=target_beta)
+            
+            bs = x.shape[0]
+            test_recon += recon.item() * bs
+            test_kl += kl.item() * bs
+            n_test += bs
+            
+            # Update the progress bar text just like in vae_train
+            pbar.set_postfix(recon=f"{recon.item():.4f}", kl=f"{kl.item():.4f}")
+
+    # 5. Print Results (Mirroring the epoch printout in vae_train)
+    final_recon = test_recon / max(1, n_test)
+    final_kl = test_kl / max(1, n_test)
+    print(f"test results: recon {final_recon:.4f} kl {final_kl:.4f}")
 
 @handle("vae-export-latents")
 def vae_export_latents_cmd():
