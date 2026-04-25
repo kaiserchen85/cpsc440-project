@@ -126,17 +126,24 @@ def main() -> None:
     xh_np = x_hat[0].cpu().numpy().astype(np.float32)
 
     plt.figure(figsize=(10, 4))
+    v_min, v_max = 0.0, 1.0
     plt.subplot(1, 2, 1)
-    plt.imshow(x_np[0], aspect="auto", origin="lower")
-    plt.title("Original Mel (Sincere)")
+    im1 = plt.imshow(x_np[0], aspect="auto", origin="lower", vmin=v_min, vmax=v_max)
+    plt.title("Original Mel (Sarcasm)")
     plt.xlabel("Time Frames")
     plt.ylabel("Mel Bins")
+    cbar1 = plt.colorbar(im1)
+    cbar1.set_label('Normalized Intensity', rotation=270, labelpad=15)
 
     plt.subplot(1, 2, 2)
-    plt.imshow(xh_np[0], aspect="auto", origin="lower")
-    plt.title("Reconstructed Mel (Sincere)")
+    im2 = plt.imshow(xh_np[0], aspect="auto", origin="lower", vmin=v_min, vmax=v_max)
+    plt.title("Reconstructed Mel (Sarcasm)")
     plt.xlabel("Time Frames")
     plt.ylabel("Mel Bins")
+    cbar2 = plt.colorbar(im2)
+    cbar2.set_label('Normalized Intensity', rotation=270, labelpad=15)
+
+    plt.tight_layout()
 
     if args.out_plot is not None:
         save_path = args.out_plot
